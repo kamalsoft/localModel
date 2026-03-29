@@ -1266,21 +1266,7 @@ echo "  3. Index your codebase: python scripts/rag_query.py --index /path/to/pro
 
 ---
 
-## Recommended Repo Structure
-
-```
-repo/
-├── ollama-custom-qwen-models.md   ← this file
-├── Modelfile.strict-coder
-├── Modelfile.explainer
-├── Modelfile.rag-coder
-├── rag_codebase.py
-├── requirements.txt
-├── .gitignore                     ← include .rag_index/
-└── README.md
-```
-
----
+ 
 
 ## License
 
