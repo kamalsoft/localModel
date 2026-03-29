@@ -1,631 +1,1287 @@
-# Ollama Custom Qwen Models — Speed, Strict Mode & VS Code Copilot Integration
+# Ollama Custom Qwen Models — Speed, Strict Mode & VS Code Copilot Integration, Complete Setup Guide
 
 > **Production-ready Modelfiles** for three custom Qwen3-Coder personas: a strict code-only engine, a verbose explainer, and a RAG-enhanced codebase reader — all tuned for maximum speed and visible in VS Code Copilot's model selector.
 
+> Covers Ollama **v0.18+**, `ollama launch`, Web Search API, cloud models, VS Code Copilot native integration, and three production-ready custom Modelfiles (Strict Coder · Verbose Explainer · RAG-Enhanced Coder).
+> 
+---
+
+<img width="595" height="593" alt="image" src="https://github.com/user-attachments/assets/e893b086-a719-4c2b-a16a-dfaa0ba5e375" />
 ---
 
 ## Table of Contents
 
-- [1. Prerequisites \& Installation](#1-prerequisites--installation)
-- [2. Mandatory Parameters Reference](#2-mandatory-parameters-reference)
-- [3. Model 1 — Strict Code-Only Mode](#3-model-1--strict-code-only-mode-qwen-strict-coder)
-- [4. Model 2 — Verbose Explainer Mode](#4-model-2--verbose-explainer-mode-qwen-explainer)
-- [5. Model 3 — RAG-Enhanced Codebase Reader](#5-model-3--rag-enhanced-codebase-reader-qwen-rag-coder)
-- [6. Speed Optimization Checklist](#6-speed-optimization-checklist)
-- [7. VS Code Copilot Integration](#7-vs-code-copilot-integration)
-- [8. Quick Command Reference](#8-quick-command-reference)
-- [9. Troubleshooting](#9-troubleshooting)
+1. [Prerequisites & Hardware](#1-prerequisites--hardware)
+2. [Install & Verify Ollama](#2-install--verify-ollama)
+3. [Choose Your Base Model](#3-choose-your-base-model)
+4. [Speed & Performance Optimization](#4-speed--performance-optimization)
+5. [Custom Modelfiles](#5-custom-modelfiles)
+6. [RAG Pipeline Setup](#6-rag-pipeline-setup)
+7. [VS Code Copilot Integration](#7-vs-code-copilot-integration)
+8. [`ollama launch` — Modern Coding Tools](#8-ollama-launch--modern-coding-tools)
+9. [Runtime Tuning & Interactive Commands](#9-runtime-tuning--interactive-commands)
+10. [Updating & Rebuilding Models](#10-updating--rebuilding-models)
+11. [Quick Reference](#11-quick-reference)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Recommended Repo Structure](#13-recommended-repo-structure)
 
 ---
 
-## 1. Prerequisites & Installation
+## 1. Prerequisites & Hardware
 
-### Install Ollama
+| Requirement | Minimum | Recommended |
+|---|---|---|
+| **Ollama version** | v0.18.0+ | v0.19.0+ (latest) |
+| **OS** | macOS 13+, Ubuntu 20.04+, Windows 10+ | macOS 14+, Ubuntu 22.04+, Windows 11 |
+| **RAM** | 16 GB | 32 GB+ |
+| **VRAM (GPU)** | 8 GB (7B models) | 24 GB+ (30B models) |
+| **Disk** | 20 GB free | 100 GB+ SSD |
 
-| Platform | Command |
-|----------|---------|
-| macOS / Linux | `curl -fsSL https://ollama.com/install.sh \| sh` |
-| Windows | Download installer from [ollama.com/download](https://ollama.com/download) |
+### VRAM Quick Calculator
 
-Verify the installation:
+| Model | Parameters (Total / Active) | Quantization | Disk Size | VRAM Needed |
+|---|---|---|---|---|
+| `qwen3-coder:7b` | 7B / 7B (dense) | Q4_K_M | ~4.5 GB | ~6 GB |
+| `qwen3-coder:14b` | 14B / 14B (dense) | Q4_K_M | ~9 GB | ~12 GB |
+| `qwen3-coder:30b` | 30.5B / 3.3B (MoE, 128 experts) | Q4_K_M | ~19 GB | ~22 GB |
+| `qwen3-coder-next` | 80B / 3B (hybrid MoE, 512 experts) | Q4_K_M | ~52 GB | ~56 GB |
+| `qwen3-coder:480b` | 480B / 35B (MoE, 160 experts) | Q4_K_M | ~290 GB | ~300 GB |
+| `qwen3-coder:480b-cloud` | 480B / 35B (cloud-hosted) | Full | 0 GB | 0 GB |
+
+> **Tip:** If your hardware can't fit a model, use cloud variants (e.g. `qwen3-coder:480b-cloud`) — see [Cloud Models](#cloud-models-zero-vram-fallback).
+
+---
+
+## 2. Install & Verify Ollama
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+```bash
+brew install ollama
+```
+
+</details>
+
+<details>
+<summary><strong>Linux</strong></summary>
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+</details>
+
+<details>
+<summary><strong>Windows</strong></summary>
+
+Download the installer from [ollama.com/download](https://ollama.com/download) and run it.
+
+</details>
+
+### Verify Installation
 
 ```bash
 ollama --version
+# Expected: ollama version is 0.18.x or higher
+
+ollama serve
+# Or equivalently:
+ollama start
 ```
 
-### Pull the Base Model
+> `ollama start` is an alias for `ollama serve` — both start the local API server on `http://localhost:11434`.
+
+### Verify the Server is Running
 
 ```bash
+curl http://localhost:11434/
+# Expected: "Ollama is running"
+```
+
+---
+
+## 3. Choose Your Base Model
+
+### Recommended Models (March 2026)
+
+| Model | Architecture | Context | Best For | Pull Command |
+|---|---|---|---|---|
+| `qwen3-coder:7b` | Dense | 256K | Fast iteration, low VRAM | `ollama pull qwen3-coder:7b` |
+| `qwen3-coder:14b` | Dense | 256K | Balanced quality/speed | `ollama pull qwen3-coder:14b` |
+| `qwen3-coder:30b` | MoE (128 experts, 8 active) | 256K | High-quality coding, 24GB+ VRAM | `ollama pull qwen3-coder:30b` |
+| `qwen3-coder-next` ⭐ | Hybrid DeltaNet+Attention+MoE (512 experts, 10+1 active) | 256K | Cutting-edge, non-thinking mode only | `ollama pull qwen3-coder-next` |
+| `qwen3-coder:480b-cloud` | MoE (cloud) | 256K | Maximum quality, zero VRAM | `ollama pull qwen3-coder:480b-cloud` |
+
+> **Recommendation:** Start with `qwen3-coder:30b` for the best local balance. Use `qwen3-coder-next` if you have 56 GB+ VRAM and want the newest hybrid architecture. Fall back to `qwen3-coder:480b-cloud` for maximum quality without hardware constraints.
+
+### Cloud Models (Zero-VRAM Fallback)
+
+Ollama now supports **cloud-hosted models** (preview, Sep 2025+). These run on Ollama's infrastructure — no local VRAM needed.
+
+```bash
+# Pull a cloud model (downloads only a tiny manifest, not weights)
+ollama pull qwen3-coder:480b-cloud
+
+# Run it like any local model
+ollama run qwen3-coder:480b-cloud
+
+# Use in custom Modelfiles
+# FROM qwen3-coder:480b-cloud
+```
+
+> **Note:** Cloud models require an internet connection and an Ollama account. They may have usage limits. Local models remain fully offline-capable.
+
+### Pull Your Chosen Base Model
+
+```bash
+# Example: pull the 30B model (recommended for most setups)
 ollama pull qwen3-coder:30b
+
+# Verify it's available
+ollama list
 ```
 
-#### Available Qwen3-Coder Tags
+---
 
-| Tag | Size | Active Params | Context | Best For |
-|-----|------|---------------|---------|----------|
-| `qwen3-coder:30b` | 19 GB | 3.3B (MoE) | 256K | Local coding, fast inference |
-| `qwen3-coder:480b` | 290 GB | 35B (MoE) | 256K | Maximum quality, needs 250 GB+ RAM |
-| `qwen3-coder:480b-cloud` | Cloud | 35B | 256K | Cloud-hosted, no local resources |
-| `qwen3-coder-next` | ~5 GB | 3B hybrid | 256K | Ultra-lightweight, local dev |
+## 4. Speed & Performance Optimization
 
-### Enable CORS for VS Code
+Every environment variable below requires **restarting the Ollama server** to take effect. Platform-specific set + restart commands are provided for each.
 
-| Platform | How |
-|----------|-----|
-| macOS | `launchctl setenv OLLAMA_ORIGINS "*"` |
-| Linux | Edit systemd service → `Environment="OLLAMA_ORIGINS=*"` then `sudo systemctl daemon-reload && sudo systemctl restart ollama` |
-| Windows | System Environment Variable → `OLLAMA_ORIGINS` = `*` |
+---
 
-**Restart Ollama after setting the variable.**
+### 4.1 Enable CORS (Required for VS Code)
 
-### Enable Flash Attention (Speed Boost)
-
-Set this environment variable **before** starting `ollama serve`:
+<details>
+<summary><strong>macOS</strong></summary>
 
 ```bash
-export OLLAMA_FLASH_ATTENTION=1
+launchctl setenv OLLAMA_ORIGINS "*"
+# Restart: quit the Ollama app from the menu bar, then reopen it
 ```
 
-> This reduces memory usage and accelerates inference on long contexts.
+</details>
+
+<details>
+<summary><strong>Linux (systemd)</strong></summary>
+
+```bash
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+sudo tee /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+[Service]
+Environment="OLLAMA_ORIGINS=*"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell — Run as Admin)</strong></summary>
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", "*", "Machine")
+# Restart: close Ollama from System Tray → reopen Ollama from Start Menu
+```
+
+</details>
 
 ---
 
-## 2. Mandatory Parameters Reference
+### 4.2 Enable Flash Attention (Speed Boost)
 
-| Parameter | Range | Default | Recommended (Code) | What It Does |
-|-----------|-------|---------|---------------------|--------------|
-| `temperature` | 0.0 – 2.0 | 0.8 | **0.1** | Controls randomness. Lower = deterministic, precise code |
-| `num_ctx` | 1 – 256000 | 2048 | **16384** | Context window in tokens. Higher = more VRAM |
-| `num_predict` | -1 to ∞ | -1 (infinite) | **4096** | Max tokens per response. Caps length for speed |
-| `top_k` | 1 – 100 | 40 | **10** | Limits token pool to top K. Lower = more focused, faster |
-| `top_p` | 0.0 – 1.0 | 0.9 | **0.85** | Nucleus sampling. Lower = less randomness |
-| `min_p` | 0.0 – 1.0 | 0.0 | **0.05** | Filters tokens below this probability |
-| `repeat_penalty` | 0.5 – 2.0 | 1.1 | **1.15** | Penalizes repeated tokens |
-| `repeat_last_n` | 0 – num_ctx | 64 | **128** | How far back to check for repetition |
-| `seed` | any integer | random | **42** | Fixed seed for reproducible output |
-| `num_gpu` | 0 – 999 | auto | **999** | GPU layers. 999 = all on GPU (fastest) |
-| `num_thread` | 1 – N | auto | **CPU cores / 2** | CPU threads. Set to physical core count |
-| `mirostat` | 0, 1, 2 | 0 | **0** | Alternative sampling. Keep 0 for code |
-| `stop` | string(s) | model default | See Modelfiles | Stop sequences that terminate generation |
+<details>
+<summary><strong>macOS</strong></summary>
 
-> **⚡ Speed Rule of Thumb:** Lower temperature + lower top_k + capped num_predict + max GPU offload = fastest possible inference.
+```bash
+launchctl setenv OLLAMA_FLASH_ATTENTION 1
+# Restart: quit Ollama from menu bar → reopen
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (systemd)</strong></summary>
+
+```bash
+# Add to the override.conf (or create if not exists):
+sudo tee -a /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+Environment="OLLAMA_FLASH_ATTENTION=1"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell — Run as Admin)</strong></summary>
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("OLLAMA_FLASH_ATTENTION", "1", "Machine")
+# Restart: close Ollama from System Tray → reopen
+```
+
+</details>
 
 ---
 
-## 3. Model 1 — Strict Code-Only Mode (`qwen-strict-coder`)
+### 4.3 Enable Quantized KV Cache (Memory Savings)
 
-**Purpose:** Outputs ONLY raw code. No explanations, no comments (unless in-code), no markdown prose.
+```
+OLLAMA_KV_CACHE_TYPE=q8_0
+```
 
-### Modelfile: `Modelfile.strict-coder`
+Reduces KV cache memory by ~50% with minimal quality loss. Options: `f16` (default), `q8_0`, `q4_0`.
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+```bash
+launchctl setenv OLLAMA_KV_CACHE_TYPE q8_0
+# Restart: quit Ollama from menu bar → reopen
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (systemd)</strong></summary>
+
+```bash
+sudo tee -a /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell — Run as Admin)</strong></summary>
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("OLLAMA_KV_CACHE_TYPE", "q8_0", "Machine")
+# Restart: close Ollama from System Tray → reopen
+```
+
+</details>
+
+---
+
+### 4.4 Keep Models in Memory (Eliminate Cold Starts)
+
+```
+OLLAMA_KEEP_ALIVE=24h
+```
+
+Keeps the model loaded in memory for the specified duration after the last request. Default is `5m`.
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+```bash
+launchctl setenv OLLAMA_KEEP_ALIVE "24h"
+# Restart: quit Ollama from menu bar → reopen
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (systemd)</strong></summary>
+
+```bash
+sudo tee -a /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+Environment="OLLAMA_KEEP_ALIVE=24h"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell — Run as Admin)</strong></summary>
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("OLLAMA_KEEP_ALIVE", "24h", "Machine")
+# Restart: close Ollama from System Tray → reopen
+```
+
+</details>
+
+---
+
+### 4.5 Enable Parallel Requests
+
+```
+OLLAMA_NUM_PARALLEL=4
+OLLAMA_MAX_LOADED_MODELS=2
+```
+
+<details>
+<summary><strong>macOS</strong></summary>
+
+```bash
+launchctl setenv OLLAMA_NUM_PARALLEL 4
+launchctl setenv OLLAMA_MAX_LOADED_MODELS 2
+# Restart: quit Ollama from menu bar → reopen
+```
+
+</details>
+
+<details>
+<summary><strong>Linux (systemd)</strong></summary>
+
+```bash
+sudo tee -a /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+Environment="OLLAMA_NUM_PARALLEL=4"
+Environment="OLLAMA_MAX_LOADED_MODELS=2"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+</details>
+
+<details>
+<summary><strong>Windows (PowerShell — Run as Admin)</strong></summary>
+
+```powershell
+[System.Environment]::SetEnvironmentVariable("OLLAMA_NUM_PARALLEL", "4", "Machine")
+[System.Environment]::SetEnvironmentVariable("OLLAMA_MAX_LOADED_MODELS", "2", "Machine")
+# Restart: close Ollama from System Tray → reopen
+```
+
+</details>
+
+---
+
+### 4.6 Detect Optimal Thread Count
+
+Run this to find your physical core count (use for `num_thread` in Modelfiles):
+
+```bash
+# macOS
+sysctl -n hw.physicalcpu
+
+# Linux
+lscpu | grep "Core(s) per socket" | awk '{print $NF}'
+
+# Windows (PowerShell)
+(Get-CimInstance Win32_Processor).NumberOfCores
+```
+
+> Use the output value for the `PARAMETER num_thread` lines in your Modelfiles. Do **not** count hyper-threads.
+
+---
+
+### 4.7 Combined systemd Override (Linux Only)
+
+For convenience, here's a single override file with all recommended settings:
+
+```bash
+sudo mkdir -p /etc/systemd/system/ollama.service.d
+sudo tee /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+[Service]
+Environment="OLLAMA_ORIGINS=*"
+Environment="OLLAMA_FLASH_ATTENTION=1"
+Environment="OLLAMA_KV_CACHE_TYPE=q8_0"
+Environment="OLLAMA_KEEP_ALIVE=24h"
+Environment="OLLAMA_NUM_PARALLEL=4"
+Environment="OLLAMA_MAX_LOADED_MODELS=2"
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl restart ollama
+```
+
+---
+
+### 4.8 Verify Environment Variables
+
+```bash
+# macOS
+launchctl getenv OLLAMA_FLASH_ATTENTION
+launchctl getenv OLLAMA_ORIGINS
+
+# Linux
+systemctl show ollama.service | grep -i environment
+
+# Windows (PowerShell)
+[System.Environment]::GetEnvironmentVariable("OLLAMA_FLASH_ATTENTION", "Machine")
+```
+
+---
+
+### 4.9 Warm Up & Verify Model is Loaded
+
+After setting env vars and restarting, warm up your model to pre-load it into memory:
+
+```bash
+curl http://localhost:11434/api/generate -d '{
+  "model": "strict-coder",
+  "prompt": "ping",
+  "stream": false
+}'
+```
+
+Then verify it's loaded:
+
+```bash
+ollama ps --verbose
+```
+
+> `ollama ps --verbose` shows detailed resource usage: VRAM, RAM, quantization, and context window per loaded model.
+
+---
+
+## 5. Custom Modelfiles
+
+### Context Length Best Practice
+
+Ollama's coding tool integrations (v0.19+) recommend a minimum context window of **65,536 tokens** for agentic coding workflows. All Modelfiles below use `num_ctx 65536`. If you're on constrained hardware, you can reduce to `16384`, but expect reduced performance in multi-file tasks.
+
+---
+
+### Model 1: `strict-coder` — Code-Only Output
+
+Create a file named `Modelfile.strict-coder`:
 
 ```dockerfile
-# ============================================================
-# MODEL: qwen-strict-coder
-# PURPOSE: Pure code output — no prose, no explanations
-# ============================================================
-
+# ─────────────────────────────────────────────────
+# strict-coder — Pure code output, zero commentary
+# ─────────────────────────────────────────────────
 FROM qwen3-coder:30b
 
-# ── System Prompt (Strict Code-Only Enforcement) ──────────
-SYSTEM """
-You are a strict code generation engine. You follow these rules WITHOUT EXCEPTION:
+SYSTEM """You are a strict code generator. Rules:
+1. Output ONLY code — no explanations, no markdown, no comments unless inside the code itself.
+2. Use the language specified in the prompt. If unspecified, use Python.
+3. Follow best practices: type hints, error handling, docstrings.
+4. Never apologize, never add disclaimers, never say "here is the code".
+5. If the request is ambiguous, make a reasonable assumption and generate code.
+6. Always produce complete, runnable code — never use placeholders like '...'.
+7. For /no_think requests, skip internal reasoning entirely."""
 
-1. OUTPUT ONLY CODE. Never output explanations, descriptions, summaries, or commentary.
-2. Do NOT wrap code in markdown code fences (no triple backticks).
-3. Do NOT add introductory text like "Here is the code" or "Sure, here you go".
-4. Do NOT add concluding text like "This code does X" or "Let me know if you need help".
-5. Include inline comments ONLY when they clarify non-obvious logic.
-6. If the user asks a question that cannot be answered with code, respond with a single-line code comment explaining why.
-7. Always use the language specified or inferred from context. Default to Python if ambiguous.
-8. Follow best practices: proper error handling, type hints, meaningful variable names.
-9. If modifying existing code, return the COMPLETE modified file, not just the diff.
-10. For multiple files, separate them with the comment: # --- FILE: filename.ext ---
-"""
-
-# ── Speed-Optimized Parameters ────────────────────────────
+# ── Speed & Determinism ──
 PARAMETER temperature 0.1
-PARAMETER top_k 10
 PARAMETER top_p 0.85
-PARAMETER min_p 0.05
-PARAMETER num_predict 4096
-PARAMETER num_ctx 16384
+PARAMETER top_k 20
 PARAMETER repeat_penalty 1.15
-PARAMETER repeat_last_n 128
-PARAMETER seed 42
-PARAMETER num_gpu 999
-PARAMETER num_thread 8
-
-# ── Stop Sequences ────────────────────────────────────────
-PARAMETER stop "<|im_start|>"
-PARAMETER stop "<|im_end|>"
-
-# ── Few-Shot Training Messages (Teach Strict Behavior) ───
-MESSAGE user "Write a Python function to reverse a string"
-MESSAGE assistant "def reverse_string(s: str) -> str:
-    return s[::-1]"
-
-MESSAGE user "Create a TypeScript interface for a user profile"
-MESSAGE assistant "interface UserProfile {
-  id: string;
-  email: string;
-  displayName: string;
-  avatarUrl?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isActive: boolean;
-}"
-
-MESSAGE user "What is recursion?"
-MESSAGE assistant "# This question cannot be answered with code alone.
-# Recursion is a function calling itself with a base case to terminate."
-```
-
-### Build & Test
-
-```bash
-# Create the model
-ollama create qwen-strict-coder -f Modelfile.strict-coder
-
-# Test strict mode (should output ONLY code)
-ollama run qwen-strict-coder "Write a FastAPI health check endpoint"
-
-# Verify no prose leaks
-ollama run qwen-strict-coder "Explain how async works in Python"
-```
-
----
-
-## 4. Model 2 — Verbose Explainer Mode (`qwen-explainer`)
-
-**Purpose:** Provides detailed, educational explanations with code. Teaches, not just generates.
-
-### Modelfile: `Modelfile.explainer`
-
-```dockerfile
-# ============================================================
-# MODEL: qwen-explainer
-# PURPOSE: Verbose teaching mode — explains everything in depth
-# ============================================================
-
-FROM qwen3-coder:30b
-
-# ── System Prompt (Verbose Explainer) ─────────────────────
-SYSTEM """
-You are an expert programming tutor and technical writer. Your responses must be thorough, educational, and well-structured. Follow these guidelines:
-
-1. ALWAYS explain the "why" behind every code decision, not just the "what".
-2. Structure every response with:
-   - **Concept Overview**: Brief explanation of the core concept
-   - **Step-by-Step Walkthrough**: Numbered breakdown of the approach
-   - **Complete Code**: Full working implementation with extensive inline comments
-   - **Key Takeaways**: Bullet points summarizing what the user should remember
-   - **Common Pitfalls**: Mistakes beginners make with this pattern
-   - **Further Reading**: Suggest related topics to explore
-3. Use analogies to explain complex concepts (e.g., "Think of a mutex like a bathroom lock").
-4. When showing code, comment EVERY significant line explaining its purpose.
-5. If multiple approaches exist, show at least two and compare their trade-offs.
-6. Use markdown formatting: headers, bold, code blocks, tables, bullet points.
-7. Assume the user is an intermediate developer who wants to deeply understand the topic.
-8. Include time and space complexity analysis for algorithms.
-9. Show both the naive approach and the optimized approach when applicable.
-"""
-
-# ── Balanced Parameters (Quality over Speed) ──────────────
-PARAMETER temperature 0.4
-PARAMETER top_k 40
-PARAMETER top_p 0.92
-PARAMETER min_p 0.03
 PARAMETER num_predict 8192
-PARAMETER num_ctx 32768
-PARAMETER repeat_penalty 1.1
-PARAMETER repeat_last_n 256
-PARAMETER seed 0
-PARAMETER num_gpu 999
+PARAMETER num_ctx 65536
+PARAMETER seed 42
+# Set num_thread to your physical core count (see Section 4.6)
 PARAMETER num_thread 8
 
-# ── Stop Sequences ────────────────────────────────────────
-PARAMETER stop "<|im_start|>"
+# ── Stop sequences ──
 PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+PARAMETER stop "```"
 ```
 
-### Build & Test
-
 ```bash
-ollama create qwen-explainer -f Modelfile.explainer
-ollama run qwen-explainer "Explain Python decorators with examples"
+ollama create strict-coder -f Modelfile.strict-coder
+ollama show --modelfile strict-coder    # Verify parameters were applied
+ollama run strict-coder "Write a Python FastAPI CRUD endpoint for a user model"
 ```
 
 ---
 
-## 5. Model 3 — RAG-Enhanced Codebase Reader (`qwen-rag-coder`)
+### Model 2: `verbose-explainer` — Detailed Teaching Mode
 
-**Purpose:** Tuned for Retrieval-Augmented Generation. Expects codebase context injected into the prompt, responds with awareness of the user's project structure, style, and dependencies.
-
-### Modelfile: `Modelfile.rag-coder`
+Create a file named `Modelfile.verbose-explainer`:
 
 ```dockerfile
-# ============================================================
-# MODEL: qwen-rag-coder
-# PURPOSE: RAG-enhanced — reads injected codebase context
-# ============================================================
-
+# ─────────────────────────────────────────────────
+# verbose-explainer — Teaching mode with deep explanations
+# ─────────────────────────────────────────────────
 FROM qwen3-coder:30b
 
-# ── System Prompt (RAG-Aware Codebase Assistant) ──────────
-SYSTEM """
-You are a codebase-aware AI assistant operating in RAG (Retrieval-Augmented Generation) mode. Context from the user's codebase will be provided at the beginning of each prompt between <codebase_context> and </codebase_context> tags.
+SYSTEM """You are a senior software engineering mentor. Rules:
+1. Explain concepts thoroughly before showing code.
+2. Use analogies and real-world examples to clarify complex ideas.
+3. Break down every code block with line-by-line explanations.
+4. Discuss trade-offs, alternatives, and potential pitfalls.
+5. Use markdown formatting: headings, bullet points, code blocks.
+6. Include "What could go wrong?" and "Production tips" sections.
+7. If the user's approach has issues, explain why and suggest improvements.
+8. End every response with "Next steps" to guide continued learning."""
 
-RULES FOR RAG MODE:
-
-1. ALWAYS read and analyze the provided codebase context before responding.
-2. Your answers must be consistent with the existing codebase:
-   - Match the coding style, naming conventions, and patterns already in use.
-   - Import from existing modules rather than suggesting new dependencies.
-   - Follow the project's established architecture and folder structure.
-   - Use existing utility functions and helpers instead of reinventing them.
-3. When suggesting new code:
-   - Specify exactly which file it belongs in (use the project's file paths).
-   - Show where it integrates with existing code (reference specific functions/classes).
-   - Ensure imports are correct relative to the project structure.
-4. When debugging:
-   - Reference specific line numbers and file paths from the context.
-   - Trace the execution flow through the actual codebase.
-   - Check for conflicts with existing implementations.
-5. If the context is insufficient to answer accurately, explicitly state what additional files or context you need.
-6. Never hallucinate file paths, function names, or APIs not present in the context.
-7. When the context includes package.json, requirements.txt, Cargo.toml, or similar, respect the existing dependency versions.
-8. Format file references as: path/to/file.ext:line_number when referencing specific locations.
-"""
-
-# ── RAG-Optimized Parameters (Large Context, Precise) ────
-PARAMETER temperature 0.15
-PARAMETER top_k 15
-PARAMETER top_p 0.88
-PARAMETER min_p 0.05
-PARAMETER num_predict 6144
+# ── Creativity & Depth ──
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER top_k 50
+PARAMETER repeat_penalty 1.1
+PARAMETER num_predict 12288
 PARAMETER num_ctx 65536
-PARAMETER repeat_penalty 1.12
-PARAMETER repeat_last_n 256
-PARAMETER seed 42
-PARAMETER num_gpu 999
+PARAMETER seed 0
+# Set num_thread to your physical core count (see Section 4.6)
 PARAMETER num_thread 8
 
-# ── Stop Sequences ────────────────────────────────────────
-PARAMETER stop "<|im_start|>"
+# ── Stop sequences ──
 PARAMETER stop "<|im_end|>"
-
-# ── Few-Shot: Teaching RAG Behavior ───────────────────────
-MESSAGE user "<codebase_context>\n# FILE: src/utils/logger.py\nimport logging\n\ndef get_logger(name: str) -> logging.Logger:\n    logger = logging.getLogger(name)\n    logger.setLevel(logging.INFO)\n    return logger\n</codebase_context>\n\nAdd error logging to the authentication module"
-MESSAGE assistant "Based on your existing `src/utils/logger.py`, here is the integration for the auth module:\n\n```python\n# FILE: src/auth/handler.py\nfrom src.utils.logger import get_logger\n\nlogger = get_logger(__name__)\n\ndef authenticate(token: str) -> bool:\n    try:\n        # validation logic here\n        return True\n    except Exception as e:\n        logger.error(f'Authentication failed: {e}')\n        return False\n```\n\nThis uses your existing `get_logger` utility to maintain consistent logging across the project."
+PARAMETER stop "<|endoftext|>"
 ```
 
-### Build & Test
-
 ```bash
-ollama create qwen-rag-coder -f Modelfile.rag-coder
-
-# Test with injected context
-ollama run qwen-rag-coder "<codebase_context>
-# FILE: app/main.py
-from fastapi import FastAPI
-app = FastAPI(title='MyAPI')
-</codebase_context>
-
-Add a /users endpoint with CRUD operations"
+ollama create verbose-explainer -f Modelfile.verbose-explainer
+ollama show --modelfile verbose-explainer    # Verify
+ollama run verbose-explainer "Explain async/await in Python with practical examples"
 ```
 
-### RAG Pipeline Setup (Python Script)
+---
 
-Save the following as `rag_codebase.py` in your project root.
+### Model 3: `rag-coder` — Codebase-Aware RAG Model
 
-**Install dependencies first:**
+Create a file named `Modelfile.rag-coder`:
+
+```dockerfile
+# ─────────────────────────────────────────────────
+# rag-coder — RAG-enhanced codebase reader
+# ─────────────────────────────────────────────────
+FROM qwen3-coder:30b
+
+SYSTEM """You are a codebase-aware coding assistant powered by retrieval-augmented generation.
+Rules:
+1. You will receive context chunks from the user's actual codebase before their question.
+2. Base your answers ONLY on the provided context + the user's question.
+3. Reference specific files, functions, and line patterns from the context.
+4. If the context doesn't contain enough information, say so explicitly.
+5. Suggest improvements that fit the existing codebase style and conventions.
+6. Never hallucinate file names, function signatures, or APIs not in context.
+7. When modifying code, show the full updated function/class, not just a diff."""
+
+# ── Balanced for RAG ──
+PARAMETER temperature 0.2
+PARAMETER top_p 0.9
+PARAMETER top_k 30
+PARAMETER repeat_penalty 1.12
+PARAMETER num_predict 10240
+PARAMETER num_ctx 65536
+PARAMETER seed 42
+# Set num_thread to your physical core count (see Section 4.6)
+PARAMETER num_thread 8
+
+# ── Stop sequences ──
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|endoftext|>"
+```
 
 ```bash
-pip install chromadb ollama
+ollama create rag-coder -f Modelfile.rag-coder
+ollama show --modelfile rag-coder    # Verify
+```
+
+---
+
+### Seed Behavior Reference
+
+| Setting | Behavior | Use Case |
+|---|---|---|
+| `seed 42` (or any fixed int) | Deterministic — same input → same output | Code generation, testing, reproducibility |
+| `seed 0` | Random seed each run | Creative tasks, brainstorming, varied output |
+| `seed` (omitted) | Model default (usually random) | General use |
+
+---
+
+## 6. RAG Pipeline Setup
+
+### 6.1 Requirements
+
+Create `requirements.txt`:
+
+```
+ollama>=0.6.0
+chromadb>=0.4.22
+rich>=13.7.0
+```
+
+```bash
+pip install -r requirements.txt
+
+# Also pull the embedding model
 ollama pull nomic-embed-text
 ```
+
+### 6.2 RAG Script — `rag_query.py`
 
 ```python
 #!/usr/bin/env python3
 """
-rag_codebase.py — Local RAG pipeline for qwen-rag-coder
-Indexes your codebase, retrieves relevant files, and queries the model.
+RAG Pipeline for rag-coder model.
+Indexes your codebase into ChromaDB, retrieves relevant chunks,
+and queries the rag-coder model with context.
 
 Usage:
-    python rag_codebase.py --index /path/to/your/project
-    python rag_codebase.py --query "Add rate limiting to the API"
+    python rag_query.py --index /path/to/your/project
+    python rag_query.py --query "How does the auth middleware work?"
+    python rag_query.py --query "Refactor the database connection pool" --top-k 10
 """
 
-import os
-import sys
-import json
 import argparse
 import hashlib
+import os
+import sys
 from pathlib import Path
-from typing import List, Dict
 
 import chromadb
 import ollama
+from rich.console import Console
+from rich.markdown import Markdown
 
-# ── Configuration ─────────────────────────────────────────
-COLLECTION_NAME = "codebase"
+# ── Configuration ──────────────────────────────────────────
 EMBED_MODEL = "nomic-embed-text"
-CHAT_MODEL = "qwen-rag-coder"
-CHROMA_PATH = "./.rag_index"
-MAX_CONTEXT_FILES = 10
-MAX_FILE_SIZE_KB = 100
+CHAT_MODEL = "rag-coder"
+COLLECTION_NAME = "codebase"
+CHUNK_SIZE = 1500        # characters per chunk
+CHUNK_OVERLAP = 200      # overlap between chunks
+INDEX_DIR = ".rag_index"
 
-# File extensions to index
-CODE_EXTENSIONS = {
+SUPPORTED_EXTENSIONS = {
     ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".go", ".rs",
-    ".cpp", ".c", ".h", ".cs", ".rb", ".php", ".swift", ".kt",
-    ".vue", ".svelte", ".html", ".css", ".scss", ".sql",
-    ".yaml", ".yml", ".toml", ".json", ".md", ".sh", ".bash",
-    ".dockerfile", ".tf", ".prisma", ".graphql",
+    ".cpp", ".c", ".h", ".hpp", ".cs", ".rb", ".php", ".swift",
+    ".kt", ".scala", ".sh", ".bash", ".yaml", ".yml", ".toml",
+    ".json", ".md", ".txt", ".sql", ".html", ".css", ".scss",
+    ".vue", ".svelte", ".dockerfile", ".tf", ".hcl",
 }
 
-# Directories to skip
-SKIP_DIRS = {
+IGNORE_DIRS = {
     "node_modules", ".git", "__pycache__", ".venv", "venv",
-    "dist", "build", ".next", ".nuxt", "target", "vendor",
-    ".rag_index", ".ollama",
+    "dist", "build", ".next", ".rag_index", ".mypy_cache",
+    "target", "bin", "obj", ".tox", "coverage",
 }
 
+console = Console()
 
-def collect_files(project_path: str) -> List[Dict]:
-    """Walk the project tree and collect indexable source files."""
+
+def chunk_text(text: str, source: str) -> list[dict]:
+    """Split text into overlapping chunks with metadata."""
+    chunks = []
+    for i in range(0, len(text), CHUNK_SIZE - CHUNK_OVERLAP):
+        chunk = text[i : i + CHUNK_SIZE]
+        if chunk.strip():
+            chunk_id = hashlib.md5(f"{source}:{i}".encode()).hexdigest()
+            chunks.append({
+                "id": chunk_id,
+                "text": chunk,
+                "metadata": {"source": source, "offset": i},
+            })
+    return chunks
+
+
+def collect_files(project_path: str) -> list[Path]:
+    """Recursively collect supported source files."""
     files = []
     for root, dirs, filenames in os.walk(project_path):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+        dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]
         for fname in filenames:
             fpath = Path(root) / fname
-            if fpath.suffix.lower() in CODE_EXTENSIONS:
-                size_kb = fpath.stat().st_size / 1024
-                if size_kb <= MAX_FILE_SIZE_KB:
-                    try:
-                        content = fpath.read_text(encoding="utf-8", errors="ignore")
-                        rel_path = str(fpath.relative_to(project_path))
-                        files.append({
-                            "path": rel_path,
-                            "content": content,
-                            "id": hashlib.md5(rel_path.encode()).hexdigest(),
-                        })
-                    except Exception:
-                        pass
-    return files
+            if fpath.suffix.lower() in SUPPORTED_EXTENSIONS:
+                files.append(fpath)
+    return sorted(files)
 
 
-def index_codebase(project_path: str):
-    """Index all source files into ChromaDB with Ollama embeddings."""
-    print(f"Scanning: {project_path}")
-    files = collect_files(project_path)
-    print(f"Found {len(files)} indexable files")
-
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
+def index_codebase(project_path: str) -> None:
+    """Index the codebase into ChromaDB with embeddings."""
+    client = chromadb.PersistentClient(path=INDEX_DIR)
 
     # Delete existing collection if re-indexing
     try:
         client.delete_collection(COLLECTION_NAME)
-    except Exception:
+    except ValueError:
         pass
 
-    collection = client.create_collection(name=COLLECTION_NAME)
+    collection = client.create_collection(
+        name=COLLECTION_NAME,
+        metadata={"hnsw:space": "cosine"},
+    )
 
-    for i, f in enumerate(files):
-        doc_text = f"# FILE: {f['path']}\n{f['content']}"
-        # Generate embedding via Ollama
-        response = ollama.embed(model=EMBED_MODEL, input=doc_text)
-        embedding = response["embeddings"][0]
+    files = collect_files(project_path)
+    if not files:
+        console.print("[red]No supported files found.[/red]")
+        sys.exit(1)
+
+    console.print(f"[cyan]Indexing {len(files)} files...[/cyan]")
+
+    all_chunks = []
+    for fpath in files:
+        try:
+            text = fpath.read_text(encoding="utf-8", errors="ignore")
+            rel = str(fpath.relative_to(project_path))
+            all_chunks.extend(chunk_text(text, rel))
+        except Exception as e:
+            console.print(f"[yellow]Skipped {fpath}: {e}[/yellow]")
+
+    if not all_chunks:
+        console.print("[red]No text chunks generated.[/red]")
+        sys.exit(1)
+
+    # Batch embed and insert
+    BATCH = 64
+    for i in range(0, len(all_chunks), BATCH):
+        batch = all_chunks[i : i + BATCH]
+        texts = [c["text"] for c in batch]
+        ids = [c["id"] for c in batch]
+        metas = [c["metadata"] for c in batch]
+
+        embeddings_resp = ollama.embed(model=EMBED_MODEL, input=texts)
+        embeddings = embeddings_resp.embeddings
 
         collection.add(
-            ids=[f["id"]],
-            documents=[doc_text],
-            embeddings=[embedding],
-            metadatas=[{"path": f["path"]}],
+            ids=ids,
+            embeddings=embeddings,
+            documents=texts,
+            metadatas=metas,
         )
-        print(f"  [{i+1}/{len(files)}] Indexed: {f['path']}")
+        console.print(f"  Indexed {min(i + BATCH, len(all_chunks))}/{len(all_chunks)} chunks")
 
-    print(f"\nIndex complete: {len(files)} files -> {CHROMA_PATH}")
+    console.print(f"[green]Done! {len(all_chunks)} chunks indexed in '{INDEX_DIR}/'[/green]")
 
 
-def query_codebase(question: str):
-    """Retrieve relevant files and query the RAG model."""
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
-    collection = client.get_collection(name=COLLECTION_NAME)
+def query_rag(question: str, top_k: int = 5) -> None:
+    """Retrieve context and query the rag-coder model."""
+    if not os.path.exists(INDEX_DIR):
+        console.print("[red]No index found. Run with --index first.[/red]")
+        sys.exit(1)
 
-    # Embed the query
-    q_response = ollama.embed(model=EMBED_MODEL, input=question)
-    q_embedding = q_response["embeddings"][0]
+    client = chromadb.PersistentClient(path=INDEX_DIR)
+    collection = client.get_collection(COLLECTION_NAME)
 
-    # Retrieve top-N relevant files
-    results = collection.query(
-        query_embeddings=[q_embedding],
-        n_results=MAX_CONTEXT_FILES,
-    )
+    # Embed the question
+    q_embedding = ollama.embed(model=EMBED_MODEL, input=[question]).embeddings[0]
+
+    # Retrieve top-k relevant chunks
+    results = collection.query(query_embeddings=[q_embedding], n_results=top_k)
 
     # Build context block
     context_parts = []
     for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-        context_parts.append(doc)
+        context_parts.append(f"### File: {meta['source']} (offset {meta['offset']})\n```\n{doc}\n```")
+
     context_block = "\n\n".join(context_parts)
 
-    # Build the RAG prompt
-    rag_prompt = f"""<codebase_context>
-{context_block}
-</codebase_context>
+    # Query the model
+    prompt = f"""## Retrieved Codebase Context
 
+{context_block}
+
+## Question
 {question}"""
 
-    print(f"\n-- Retrieved {len(context_parts)} files --")
-    for meta in results["metadatas"][0]:
-        print(f"  * {meta['path']}")
-    print(f"-- Querying {CHAT_MODEL} --\n")
+    console.print("[cyan]Querying rag-coder...[/cyan]\n")
 
-    # Stream the response
-    stream = ollama.chat(
+    response = ollama.chat(
         model=CHAT_MODEL,
-        messages=[{"role": "user", "content": rag_prompt}],
-        stream=True,
+        messages=[{"role": "user", "content": prompt}],
     )
-    for chunk in stream:
-        print(chunk["message"]["content"], end="", flush=True)
-    print()
+
+    console.print(Markdown(response.message.content))
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="RAG Codebase Assistant")
-    parser.add_argument("--index", type=str, help="Path to project to index")
-    parser.add_argument("--query", type=str, help="Question about your codebase")
+def main():
+    parser = argparse.ArgumentParser(description="RAG pipeline for rag-coder")
+    parser.add_argument("--index", type=str, help="Path to project directory to index")
+    parser.add_argument("--query", type=str, help="Question to ask about the codebase")
+    parser.add_argument("--top-k", type=int, default=5, help="Number of context chunks (default: 5)")
     args = parser.parse_args()
 
     if args.index:
         index_codebase(args.index)
     elif args.query:
-        query_codebase(args.query)
+        query_rag(args.query, top_k=args.top_k)
     else:
         parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
 ```
 
-**Usage:**
+### 6.3 `.gitignore`
 
-```bash
-# Step 1: Index your project
-python rag_codebase.py --index /path/to/your/project
+Add to your project's `.gitignore`:
 
-# Step 2: Query with codebase awareness
-python rag_codebase.py --query "How does the authentication middleware work?"
-python rag_codebase.py --query "Add pagination to the /users endpoint"
+```
+.rag_index/
+__pycache__/
+*.pyc
 ```
 
----
+### 6.4 Web Search API Enhancement (Optional)
 
-## 6. Speed Optimization Checklist
+Ollama now provides a **built-in Web Search API** (Sep 2025+) that can augment your RAG pipeline with real-time web data. This is useful for the `verbose-explainer` model or any context that needs current documentation.
 
-1. **GPU Offload Everything** — `PARAMETER num_gpu 999` forces all layers onto GPU. If you get OOM errors, reduce by 4 at a time.
-2. **Enable Flash Attention** — Set `OLLAMA_FLASH_ATTENTION=1` as an environment variable before starting `ollama serve`.
-3. **Cap Output Length** — `PARAMETER num_predict 4096` prevents runaway generation. Increase for explainer mode.
-4. **Lower Temperature** — `PARAMETER temperature 0.1` reduces sampling computation and produces deterministic output.
-5. **Restrict Token Pool** — `PARAMETER top_k 10` + `PARAMETER top_p 0.85` = fewer candidates = faster selection.
-6. **Set Thread Count** — `PARAMETER num_thread N` — set to your physical CPU core count (not hyperthreads):
-   - Linux: `nproc`
-   - macOS: `sysctl -n hw.physicalcpu`
-   - Windows: Task Manager → Performance → Cores
-7. **Keep Model Loaded** — `OLLAMA_KEEP_ALIVE=-1` keeps the model in memory permanently (no cold-start delay).
-8. **Use Quantized Models** — Prefer Q4_K_M (default for 30b) for speed. Use Q8_0 only with VRAM headroom.
-9. **Reduce Context Window** — Use `num_ctx 16384` instead of 65536 unless you need long context. VRAM scales quadratically with context.
-10. **Monitor Performance** — `ollama ps` to check loaded models and VRAM. `nvidia-smi` for GPU utilization.
+```python
+import ollama
+
+# Requires: export OLLAMA_API_KEY="your_api_key"
+# Get your API key at https://ollama.com (free account)
+
+# Search the web
+results = ollama.web_search("FastAPI dependency injection best practices", max_results=5)
+for r in results.results:
+    print(f"  {r.title}: {r.url}")
+
+# Fetch full page content as markdown
+page = ollama.web_fetch("https://fastapi.tiangolo.com/tutorial/dependencies/")
+print(page.content[:500])
+```
+
+> **Tip:** Combine `web_search` results with your local RAG context to give the `rag-coder` model both codebase awareness and current documentation.
 
 ---
 
 ## 7. VS Code Copilot Integration
 
-### Step 1: Ensure Ollama Is Running
+### 7.1 Native Integration (Official Method — Ollama v0.18.3+)
 
-```bash
-ollama serve
-# Verify:
-curl http://localhost:11434/api/tags
-```
+As of Ollama v0.18.3, VS Code Copilot **natively integrates** with Ollama. No extensions needed.
 
-### Step 2: Add Ollama as a Model Provider
-
-1. Open **VS Code**
+1. Open VS Code
 2. Open the **Copilot Chat** sidebar (`Ctrl+Shift+I` / `Cmd+Shift+I`)
 3. Click the **model dropdown** at the top of the chat panel
-4. Click **"Manage Models"**
-5. Click **"Add Models"** (top-right)
-6. Select **"Ollama"** as the provider
-7. Enter the endpoint: `http://localhost:11434/`
-8. Press **Enter**
+4. Click **Manage Models...**
+5. Under **Provider**, select or type **Ollama**
+6. Your custom models (`strict-coder`, `verbose-explainer`, `rag-coder`) will appear in the model list
+7. Select a model and start chatting
 
-### Step 3: Enable Your Custom Models
+### 7.2 Alternative: `settings.json` Configuration
 
-After adding the Ollama provider:
+If you prefer explicit configuration, add this to your VS Code `settings.json` (`Ctrl+,` → Open Settings JSON):
 
-- Your three models (`qwen-strict-coder`, `qwen-explainer`, `qwen-rag-coder`) appear in the model list
-- Click the **eye icon** (👁️) next to each model to make it visible in the dropdown
-- Models appear in **Ask mode** by default
-- For **Agent mode** (tool-calling), the model must support tool calling — Qwen3-Coder supports this natively. If it doesn't appear in Agent mode, use **VS Code Insiders** (known bug in stable, patched in Insiders)
-
-### Step 4: Manual `settings.json` Config (Optional)
-
-```json
+```jsonc
 {
-  "github.copilot.chat.models": [
-    {
-      "provider": "ollama",
-      "model": "qwen-strict-coder",
-      "endpoint": "http://localhost:11434"
-    },
-    {
-      "provider": "ollama",
-      "model": "qwen-explainer",
-      "endpoint": "http://localhost:11434"
-    },
-    {
-      "provider": "ollama",
-      "model": "qwen-rag-coder",
-      "endpoint": "http://localhost:11434"
-    }
-  ]
+    "github.copilot.chat.models": [
+        {
+            "vendor": "ollama",
+            "provider": "ollama",
+            "family": "strict-coder",
+            "id": "strict-coder",
+            "name": "Strict Coder (Ollama)",
+            "url": "http://localhost:11434"
+        },
+        {
+            "vendor": "ollama",
+            "provider": "ollama",
+            "family": "verbose-explainer",
+            "id": "verbose-explainer",
+            "name": "Verbose Explainer (Ollama)",
+            "url": "http://localhost:11434"
+        },
+        {
+            "vendor": "ollama",
+            "provider": "ollama",
+            "family": "rag-coder",
+            "id": "rag-coder",
+            "name": "RAG Coder (Ollama)",
+            "url": "http://localhost:11434"
+        }
+    ]
 }
 ```
 
-### Mode Compatibility
+### 7.3 Inline Completions (Optional)
 
-| Model | Ask Mode | Agent Mode | Edit Mode |
-|-------|----------|------------|-----------|
-| `qwen-strict-coder` | ✅ | ✅ (tool-calling inherited) | ✅ |
-| `qwen-explainer` | ✅ | ✅ | ✅ |
-| `qwen-rag-coder` | ✅ | ✅ | ✅ |
+For tab-completion suggestions powered by Ollama:
+
+```jsonc
+{
+    "github.copilot.advanced.inlineSuggestProvider": "ollama",
+    "ollama.model": "strict-coder",
+    "ollama.endpoint": "http://localhost:11434"
+}
+```
+
+### 7.4 Alternative Extension: Ollama Copilot
+
+If the native integration doesn't suit your workflow, install the **[Ollama Copilot](https://marketplace.visualstudio.com/items?itemName=ollama-copilot)** extension from the VS Code Marketplace:
+
+```jsonc
+{
+    "ollama-copilot.baseUrl": "http://127.0.0.1:11434",
+    "ollama-copilot.model": "strict-coder"
+}
+```
+
+### ⚠️ Privacy Note
+
+> Even with a local Ollama endpoint, GitHub Copilot **may still transmit usage telemetry or prompt metadata** depending on your VS Code and Copilot settings. To minimize this:
+>
+> 1. Disable telemetry: `"telemetry.telemetryLevel": "off"`
+> 2. Review Copilot settings: `"github.copilot.advanced.debug.telemetry": false`
+> 3. For fully air-gapped setups, consider using **Continue.dev** or **ollama launch** (Section 8) instead.
+
+---
+
+## 8. `ollama launch` — Modern Coding Tools
+
+**`ollama launch`** (v0.15+, January 2026) is Ollama's flagship command for coding tool integrations. It sets up and runs coding agents with your local (or cloud) models in a single command — no environment variables or config files needed.
+
+### Supported Coding Tools
+
+| Tool | Command | Description |
+|---|---|---|
+| **Claude Code** | `ollama launch claude` | Anthropic's agentic coding CLI |
+| **OpenCode** | `ollama launch opencode` | Terminal-based coding assistant |
+| **Codex** | `ollama launch codex` | OpenAI's code generation tool |
+| **Droid** | `ollama launch droid` | Android development assistant |
+| **OpenClaw** | `ollama launch openclaw` | Open-source coding agent |
+
+### Using Custom Models with `ollama launch`
+
+Your custom Modelfile-based models work seamlessly with `ollama launch`:
+
+```bash
+# Launch Claude Code with your strict-coder model
+ollama launch claude --model strict-coder
+
+# Launch OpenCode with your verbose-explainer
+ollama launch opencode --model verbose-explainer
+
+# Launch with the latest Qwen model
+ollama launch claude --model qwen3-coder-next
+
+# Configure a tool without launching it
+ollama launch claude --config
+```
+
+### When to Use `ollama launch` vs VS Code Copilot
+
+| Feature | `ollama launch` | VS Code Copilot + Ollama |
+|---|---|---|
+| **Setup complexity** | Zero config | Requires env vars + settings |
+| **Interface** | Terminal / agent CLI | VS Code IDE |
+| **Agentic capabilities** | Full agent loop (file editing, commands) | Chat + inline completions |
+| **Custom models** | ✅ `--model strict-coder` | ✅ Via model selector |
+| **Offline** | ✅ Fully local | ⚠️ May send telemetry |
+| **Best for** | Terminal-first workflows, agentic coding | IDE-integrated coding |
+
+> **Recommendation:** Use `ollama launch` for agentic, terminal-first coding workflows. Use VS Code Copilot integration for IDE-embedded assistance. Both work with your custom Modelfiles.
 
 ---
 
-## 8. Quick Command Reference
+## 9. Runtime Tuning & Interactive Commands
 
-| Action | Command |
-|--------|---------|
-| Pull base model | `ollama pull qwen3-coder:30b` |
-| Pull embedding model | `ollama pull nomic-embed-text` |
-| Create strict coder | `ollama create qwen-strict-coder -f Modelfile.strict-coder` |
-| Create explainer | `ollama create qwen-explainer -f Modelfile.explainer` |
-| Create RAG coder | `ollama create qwen-rag-coder -f Modelfile.rag-coder` |
-| List all models | `ollama list` |
-| Show model config | `ollama show --modelfile qwen-strict-coder` |
-| Test a model | `ollama run qwen-strict-coder "Write a Python fizzbuzz"` |
-| Check running models | `ollama ps` |
-| Delete a model | `ollama rm model-name` |
-| Index codebase (RAG) | `python rag_codebase.py --index /path/to/project` |
-| Query codebase (RAG) | `python rag_codebase.py --query "How does auth work?"` |
-| Start Ollama server | `ollama serve` |
-| Check GPU usage | `nvidia-smi` (NVIDIA) or `ollama ps` |
+### 9.1 Interactive `/set` Commands
+
+When running a model interactively (`ollama run <model>`), you can tune parameters on the fly without rebuilding the Modelfile:
+
+```
+>>> /set parameter temperature 0.3
+Set parameter 'temperature' to '0.3'
+
+>>> /set parameter num_ctx 32768
+Set parameter 'num_ctx' to '32768'
+
+>>> /set parameter top_p 0.8
+Set parameter 'top_p' to '0.8'
+
+>>> /set parameter seed 42
+Set parameter 'seed' to '42'
+
+>>> /set system "You are a Python expert. Output only code."
+Set system prompt.
+
+>>> /show parameter
+Displays current parameter values.
+
+>>> /show system
+Displays current system prompt.
+```
+
+> **Note:** `/set` changes are session-only. To make them permanent, update the Modelfile and re-create the model.
+
+### 9.2 `ollama generate` — Scripted / CI Usage
+
+For non-interactive, scripted, or CI/CD usage:
+
+```bash
+# Single-shot generation (no conversation context)
+ollama generate strict-coder "Write a Python decorator for retry with exponential backoff"
+
+# JSON output (structured responses)
+ollama generate strict-coder "Return a JSON schema for a User model" --format json
+
+# Pipe into a file
+ollama generate strict-coder "Write a Dockerfile for a Python FastAPI app" > Dockerfile
+```
 
 ---
 
-## 9. Troubleshooting
+## 10. Updating & Rebuilding Models
 
-| Problem | Cause | Fix |
-|---------|-------|-----|
-| Models not visible in Copilot | Eye icon not toggled | Click 👁️ next to each model in Manage Models |
-| Models missing from Agent mode | Lack of tool-calling or VS Code bug | Use Ask mode, or switch to VS Code Insiders |
-| "Connection refused" from VS Code | Ollama not running or CORS blocked | Run `ollama serve` and set `OLLAMA_ORIGINS=*` |
-| Slow first response | Cold start — model loading into memory | Set `OLLAMA_KEEP_ALIVE=-1` to keep model resident |
-| Out of Memory (OOM) | Too many GPU layers or context too large | Reduce `num_gpu` by 4, or lower `num_ctx` |
-| Repetitive output | Repeat penalty too low | Increase `repeat_penalty` to 1.2 and `repeat_last_n` to 256 |
-| Strict model still outputs prose | System prompt not enforced | Verify with `ollama show --modelfile qwen-strict-coder`, rebuild if needed |
-| RAG returns irrelevant files | Stale index | Re-run `python rag_codebase.py --index /path/to/project` |
+When the base model is updated by Ollama (e.g. `qwen3-coder:30b` gets a new version), your custom models **do not** auto-update. Rebuild them:
+
+```bash
+# 1. Pull the latest base model
+ollama pull qwen3-coder:30b
+
+# 2. Rebuild each custom model from its Modelfile
+ollama create strict-coder -f Modelfile.strict-coder
+ollama create verbose-explainer -f Modelfile.verbose-explainer
+ollama create rag-coder -f Modelfile.rag-coder
+
+# 3. Verify each rebuild
+ollama show --modelfile strict-coder
+ollama show --modelfile verbose-explainer
+ollama show --modelfile rag-coder
+
+# 4. (Optional) Clean up old model cache
+ollama prune
+```
+
+> **Tip:** Add a rebuild script to your repo (see [Recommended Repo Structure](#13-recommended-repo-structure)).
 
 ---
-``` repo
+
+## 11. Quick Reference
+
+### Essential Commands
+
+| Command | Description |
+|---|---|
+| `ollama serve` / `ollama start` | Start the Ollama server |
+| `ollama pull <model>` | Download a model |
+| `ollama create <name> -f <file>` | Create custom model from Modelfile |
+| `ollama run <model>` | Interactive chat session |
+| `ollama generate <model> "prompt"` | Single-shot generation (non-interactive) |
+| `ollama generate <model> "prompt" --format json` | Structured JSON output |
+| `ollama list` | List all local models |
+| `ollama ps` | Show running models |
+| `ollama ps --verbose` | Detailed resource usage per model |
+| `ollama show --modelfile <model>` | Inspect a model's Modelfile |
+| `ollama stop <model>` | Unload model from memory (keep server running) |
+| `ollama rm <model>` | Delete a model |
+| `ollama prune` | Clear model cache |
+| `ollama logs` | View server logs |
+| `ollama launch <tool> --model <model>` | Launch a coding tool with a specific model |
+| `ollama launch <tool> --config` | Configure a coding tool without launching |
+| `ollama cp <src> <dst>` | Copy/rename a model |
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `http://localhost:11434/` | GET | Health check |
+| `http://localhost:11434/api/generate` | POST | Single-shot generation |
+| `http://localhost:11434/api/chat` | POST | Chat completion |
+| `http://localhost:11434/api/embed` | POST | Generate embeddings |
+| `http://localhost:11434/api/tags` | GET | List models |
+| `http://localhost:11434/api/ps` | GET | List running models |
+| `https://ollama.com/api/web_search` | POST | Web search (requires API key) |
+| `https://ollama.com/api/web_fetch` | POST | Fetch URL content (requires API key) |
+
+### Parameter Tuning Cheat Sheet
+
+| Parameter | Strict Code | Verbose Explainer | RAG Coder | What It Does |
+|---|---|---|---|---|
+| `temperature` | 0.1 | 0.7 | 0.2 | Randomness (0 = deterministic, 1 = creative) |
+| `top_p` | 0.85 | 0.9 | 0.9 | Nucleus sampling threshold |
+| `top_k` | 20 | 50 | 30 | Vocabulary cutoff per token |
+| `repeat_penalty` | 1.15 | 1.1 | 1.12 | Penalize repeated tokens |
+| `num_predict` | 8192 | 12288 | 10240 | Max tokens to generate |
+| `num_ctx` | 65536 | 65536 | 65536 | Context window (tokens) |
+| `seed` | 42 | 0 | 42 | Reproducibility (42=fixed, 0=random) |
+
+---
+
+## 12. Troubleshooting
+
+<details>
+<summary><strong>Model not appearing in VS Code Copilot</strong></summary>
+
+1. Verify the model exists: `ollama list` — your custom models should appear
+2. Verify Ollama is running: `curl http://localhost:11434/`
+3. Verify CORS is set: check `OLLAMA_ORIGINS` (see Section 4.8)
+4. Restart VS Code after changing Ollama settings
+5. In Copilot Chat, click model dropdown → Manage Models → ensure "Ollama" provider is selected
+
+</details>
+
+<details>
+<summary><strong>Slow first response (cold start)</strong></summary>
+
+1. Set `OLLAMA_KEEP_ALIVE=24h` (Section 4.4)
+2. Warm up the model after restart (Section 4.9)
+3. Enable Flash Attention (Section 4.2)
+4. Enable quantized KV cache (Section 4.3)
+5. Check `ollama ps --verbose` to confirm model is loaded in GPU memory
+
+</details>
+
+<details>
+<summary><strong>Out of memory (OOM) errors</strong></summary>
+
+1. Use a smaller model: `qwen3-coder:7b` or `qwen3-coder:14b`
+2. Reduce `num_ctx` to `16384` or `32768`
+3. Enable `OLLAMA_KV_CACHE_TYPE=q4_0` for maximum memory savings
+4. Set `OLLAMA_MAX_LOADED_MODELS=1` to prevent multiple models from loading
+5. Close other GPU-heavy applications
+6. Consider cloud models: `qwen3-coder:480b-cloud` uses zero local VRAM
+
+</details>
+
+<details>
+<summary><strong>Model outputs explanations instead of code (strict-coder)</strong></summary>
+
+1. Verify the Modelfile was applied: `ollama show --modelfile strict-coder`
+2. Check `temperature` is `0.1` and `top_k` is `20`
+3. Re-create the model: `ollama create strict-coder -f Modelfile.strict-coder`
+4. Use `/no_think` prefix in prompts to disable internal reasoning
+
+</details>
+
+<details>
+<summary><strong>RAG script errors</strong></summary>
+
+1. Ensure `ollama>=0.6.0` is installed: `pip show ollama`
+2. Ensure `nomic-embed-text` is pulled: `ollama pull nomic-embed-text`
+3. Ensure `rag-coder` model exists: `ollama list | grep rag-coder`
+4. Re-index if files changed: `python rag_query.py --index /path/to/project`
+5. Check ChromaDB index exists: `ls -la .rag_index/`
+
+</details>
+
+<details>
+<summary><strong>Connection refused / server not running</strong></summary>
+
+```bash
+# Check if Ollama is running
+ollama ps
+
+# Check server logs
+ollama logs
+
+# Start the server
+ollama serve
+
+# If port is in use, find and kill the process:
+# macOS/Linux
+lsof -i :11434
+kill -9 <PID>
+
+# Windows (PowerShell)
+netstat -ano | findstr :11434
+taskkill /PID <PID> /F
+```
+
+</details>
+
+---
+
+## 13. Recommended Repo Structure
+
+```
+ollama-custom-models/
+├── README.md                          # This guide
+├── modelfiles/
+│   ├── Modelfile.strict-coder
+│   ├── Modelfile.verbose-explainer
+│   └── Modelfile.rag-coder
+├── scripts/
+│   ├── rag_query.py                   # RAG pipeline
+│   ├── rebuild_models.sh              # Rebuild all models after base update
+│   └── setup.sh                       # One-command setup
+├── vscode/
+│   └── settings.json                  # VS Code settings snippet
+├── requirements.txt
+├── .gitignore
+└── LICENSE
+```
+
+### `scripts/rebuild_models.sh`
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+echo "Pulling latest base model..."
+ollama pull qwen3-coder:30b
+
+echo "Rebuilding custom models..."
+ollama create strict-coder -f modelfiles/Modelfile.strict-coder
+ollama create verbose-explainer -f modelfiles/Modelfile.verbose-explainer
+ollama create rag-coder -f modelfiles/Modelfile.rag-coder
+
+echo "Verifying..."
+ollama list | grep -E "strict-coder|verbose-explainer|rag-coder"
+
+echo "All models rebuilt successfully."
+```
+
+```bash
+chmod +x scripts/rebuild_models.sh
+./scripts/rebuild_models.sh
+```
+
+### `scripts/setup.sh`
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+echo "=== Ollama Custom Models Setup ==="
+
+# 1. Check Ollama is installed
+if ! command -v ollama &>/dev/null; then
+    echo "Ollama not found. Install from https://ollama.com/download"
+    exit 1
+fi
+
+echo "Ollama version: $(ollama --version)"
+
+# 2. Pull base model + embedding model
+echo "Pulling models..."
+ollama pull qwen3-coder:30b
+ollama pull nomic-embed-text
+
+# 3. Create custom models
+echo "Creating custom models..."
+ollama create strict-coder -f modelfiles/Modelfile.strict-coder
+ollama create verbose-explainer -f modelfiles/Modelfile.verbose-explainer
+ollama create rag-coder -f modelfiles/Modelfile.rag-coder
+
+# 4. Install Python dependencies
+echo "Installing Python dependencies..."
+pip install -r requirements.txt
+
+# 5. Verify
+echo ""
+echo "=== Setup Complete ==="
+echo "Available custom models:"
+ollama list | grep -E "strict-coder|verbose-explainer|rag-coder"
+echo ""
+echo "Next steps:"
+echo "  1. Set environment variables (see README Section 4)"
+echo "  2. Open VS Code → Copilot Chat → Model dropdown → Manage Models → Ollama"
+echo "  3. Index your codebase: python scripts/rag_query.py --index /path/to/project"
+```
+
+---
+
+## Recommended Repo Structure
+
+```
 repo/
-├── ollama-custom-qwen-models.md
+├── ollama-custom-qwen-models.md   ← this file
 ├── Modelfile.strict-coder
 ├── Modelfile.explainer
 ├── Modelfile.rag-coder
-└── rag_codebase.py
+├── rag_codebase.py
+├── requirements.txt
+├── .gitignore                     ← include .rag_index/
+└── README.md
 ```
+
 ---
 
 ## License
 
-MIT — use, modify, and share freely.
+MIT — use freely, attribute if you share.
